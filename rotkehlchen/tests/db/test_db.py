@@ -551,7 +551,7 @@ def test_writing_fetching_data(data_dir, username, sql_vm_instructions_cb):
         'main_currency': DEFAULT_MAIN_CURRENCY.identifier,
         'date_display_format': DEFAULT_DATE_DISPLAY_FORMAT,
         'premium_should_sync': False,
-        'submit_usage_analytics': True,
+        'submit_usage_analytics': False,
         'last_write_ts': 0,
         'active_modules': DEFAULT_ACTIVE_MODULES,
         'frontend_settings': '',

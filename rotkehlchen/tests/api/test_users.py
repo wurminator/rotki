@@ -167,7 +167,7 @@ def test_user_creation(
             else:
                 result = assert_proper_sync_response_with_result(response)
 
-        check_proper_unlock_result(result, {'submit_usage_analytics': True})
+        check_proper_unlock_result(result, {'submit_usage_analytics': False})
 
         # Query users and make sure the new user is logged in
         response = requests.get(api_url_for(rotkehlchen_api_server, 'usersresource'))
