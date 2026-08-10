@@ -963,3 +963,98 @@ When reviewing code changes, follow this systematic approach:
   ❌ WRONG: '0x5a0b54d5dc17e0aadc383d2db43b0a0d3e029c4c'
 - If you see "Invalid XXX account in DB" it's almost certain the address is not checksummed. Always checksum addresses you use with to_checksum_address
 - `string_to_evm_address()` is just a no-op typing function. It will not checksum the literal argument to a checksummed evm address. That means you should make sure to only give checksummed EVM address literals to it
+
+---
+
+## rotki_CryptoSteuer (RCS) — Projekt-Kontext
+
+> **Achtung:** Die Abschnitte oben gelten dem Upstream-Rotki. Der folgende Abschnitt beschreibt den Fork-spezifischen deutschen Steuer-Layer (DE-Tax-Layer), der on-top von Rotki gebaut wird.
+
+### Was ist RCS?
+
+Ein persönliches Krypto-Steuer-Tool für die deutsche Steuererklärung, basierend auf diesem Rotki-Fork. Rotki bringt ~70 % der Funktionalität mit (FiFo-Engine, Multi-Chain, DeFi-Decoder, 22 CEX-Integrationen, EUR-Preis-Oracles). Der Projekt-Fokus liegt auf dem **deutschen Steuer-Layer on-top von Rotki** gemäß **BMF-Schreiben v. 06.03.2025** (GZ IV C 1 - S 2256/00042/064/043, DStR 2025, 1289).
+
+### Referenzen
+
+- **Projekt-Briefing (vollständig):** `T:\Daten\ProtonDrive\My files\Dokumente\41 Obsidian\Second-Brain\01 - Projects\KryptoSteuer\rotki_CryptoSteuer — Projekt-Briefing.md`
+- **Plane-Board:** Projekt `rotki_CryptoSteuer` (Identifier `RCS`), ID `225e88d2-dc6b-4a59-93ea-214b237e81e2`. Aktuell 48 Tickets.
+- **Repos:** Fork = `wurminator/rotki` (origin), Upstream = `rotki/rotki` (upstream-Remote konfiguriert).
+
+### Architektur-Regeln für neue DE-Module
+
+1. **Isolation statt Monkey-Patching:** Jegliche DE-Logik wird isoliert unter `rotkehlchen/accounting/de_*/` hinzugefügt. Upstream-Rotki-Code wird nicht direkt modifiziert, außer bei zwingenden Core-Changes (siehe Ausnahmen unten).
+2. **Namenskonvention:** Prefix `de_` für DE-spezifische Module — z.B. `de_bmf/` (BMF-Klassifizierung), `de_anlage_so/` (Anlage SO Report).
+3. **Tests:** DE-Tests als eigene Suite unter `rotkehlchen/tests/unit/accounting/test_de_*.py`. Test-Data: Bekannte Transaction-Sets mit erwartetem Anlage-SO-Output.
+4. **BMF-Konstanten:** Zentral in einer `constants_de.py` sammeln (Freigrenzen, Haltefristen, etc.).
+5. **Imports:** Absolut, z.B. `from rotkehlchen.accounting.de_bmf.classification import BmfCategory`.
+
+### Ausnahmen: Erlaubte Core-Changes
+
+Diese Core-Änderungen sind explizit Teil des Projekts (jeweils durch ein URGENT-Ticket begründet):
+
+- **RCS-35 (Pro-Wallet FiFo, URGENT):** `rotkehlchen/accounting/cost_basis/base.py` — `CostBasisCalculator` muss von `defaultdict[Asset, CostBasisEvents]` (global) auf eine wallet-keyed Struktur umgebaut werden. BMF Rz. 61–63 fordert walletspezifische FiFo-Trennung. **Ohne diese Änderung sind alle Steuerberechnungen für Multi-Wallet-Setups falsch.**
+- **RCS-28 (Holding-Period):** `rotkehlchen/db/settings.py` — aktueller Default `taxfree_after_period = YEAR_IN_SECONDS = 31_536_000` (365 Tage). BMF will Kalenderjahr-Logik, nicht 365-Tage-Logik.
+- **RCS-31 (Gas-Fee):** `rotkehlchen/chain/evm/accounting/` — Gas-Fees als Cost-Basis-Komponente (ADR-0010), nicht als sofort absetzbarer Aufwand.
+
+### Module (geplant)
+
+```
+rotkehlchen/accounting/
+├── de_bmf/                      ← RCS-5: BMF-Klassifizierung
+│   ├── __init__.py
+│   ├── types.py                    # BmfCategory Enum, Freigrenzen
+│   ├── classification.py           # HistoryEventType+SubType → BmfCategory
+│   └── constants_de.py             # BMF-Konstanten zentral
+├── de_anlage_so/                ← RCS-10: Anlage SO Report-Generator
+│   ├── generator.py                # Zeile 73–78 Logik
+│   ├── pdf_template.py             # PDF-Ausgabe
+│   └── csv_export.py               # CSV-Ausgabe
+├── cost_basis/
+│   └── base.py                     # ⚠️ MODIFIED by RCS-35 (Pro-Wallet FiFo)
+├── export/
+│   ├── erweb_xml.py             ← RCS-26: ERWEB XML-Export
+│   └── audit_trail.py           ← RCS-27: Finanzamt-Begleitbrief
+├── holding_period_de.py         ← RCS-28: Kalenderjahr-Holding-Period
+└── tax_optimizer.py             ← RCS-29: Tax Harvesting Vorschläge
+```
+
+### Wichtige Domain-Konzepte
+
+| Konzept | Quelle | Anmerkung |
+|---|---|---|
+| FiFo walletspezifisch | ADR-0003, BMF Rz. 61–63 | Rotki macht es aktuell global → RCS-35 ändert das |
+| 1-Jahres-Haltefrist | §23 Abs. 1 Nr. 2 EStG | Kalenderjahr-bezogen, nicht 365 Tage → RCS-28 |
+| Freigrenze 600€ / 1.000€ | §23 Abs. 3 EStG | Gesamtgewinn, keine Teilfreigrenze → RCS-42 |
+| Verlusttöpfe | §23 Abs. 3 EStG | Pro Wallet/Asset, Verlustvortrag → RCS-14 |
+| Teilrechnung | BMF Rz. 106 | Nur Krypto-Einkünfte, externe §23/§22 manuell addieren → RCS-33 |
+| Staking-Zugangsfiktion | BMF Rz. 67 | Claiming-Fiktion am Jahresende → RCS-36 |
+
+### BMF-Kategorien (Mapping Rotki-Event → BMF)
+
+| BMF-Kategorie | Rotki-Event (Type + SubType) |
+|---|---|
+| Verkauf/Veräußerung | `TRADE` + Fiat-Gegenpart |
+| Tausch | `TRADE` + Crypto-Gegenpart |
+| Sonstiges Entgelt | `SPEND` + `PAYMENT` |
+| Unentgeltlich | `RECEIVE` + `DONATE` |
+| Staking | `RECEIVE` + `REWARD` (Staking) |
+| Lending | `RECEIVE` + `INTEREST` |
+| Airdrop | `RECEIVE` + `AIRDROP` |
+| Gas Fee | `SPEND` + `FEE` |
+| Migration | `TRANSFER` |
+| Wrap/Unwrap | `RECEIVE` + `RECEIVE_WRAPPED` |
+
+### Setup-Hinweise (Windows-spezifisch)
+
+- **MSVC 2022 Build Tools** müssen installiert sein (für native Python-Pakete wie `sqlcipher3`, `cytoolz`).
+- **Node 24.x via fnm** (`fnm use 24` vor pnpm-Kommandos) — Node 26 ist inkompatibel.
+- **`uv sync`** erfordert aktiviertes MSVC-Environment (`vcvars64.bat`), wenn native Pakete neu gebaut werden müssen. Nach einmaligem Build läuft es auch ohne.
+- **Frontend-Kommandos aus `frontend/`** ausführen, nicht aus `frontend/app/` (laut AGENTS.md).
+
+### Roadmap (Stand 09.08.2026)
+
+1. ✅ **Phase 0:** Workspace-Setup (RCS-21 abgeschlossen)
+2. ⏳ **Phase 1 — DE-Foundations:** RCS-35 (Pro-Wallet FiFo, URGENT), RCS-5 (BMF-Klassifizierung), RCS-28 (Holding-Period), RCS-31 (Gas-Fee)
+3. ⏳ **Phase 2 — Report-Generierung:** RCS-10 (Anlage SO), RCS-33 (Teilrechnung-Banner), RCS-27 (Audit-Trail)
+4. ⏳ **Phase 3 — Advanced:** RCS-29 (Tax Optimizer), RCS-26 (ERWEB XML), RCS-30 (Airdrop-Edge-Cases)
+5. ⏳ **Phase 4 — Deployment:** RCS-17 (Docker/Railway)
