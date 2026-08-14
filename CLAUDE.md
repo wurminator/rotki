@@ -1051,6 +1051,29 @@ rotkehlchen/accounting/
 - **`uv sync`** erfordert aktiviertes MSVC-Environment (`vcvars64.bat`), wenn native Pakete neu gebaut werden müssen. Nach einmaligem Build läuft es auch ohne.
 - **Frontend-Kommandos aus `frontend/`** ausführen, nicht aus `frontend/app/` (laut AGENTS.md).
 
+### Web-Dev-Modus (schnelles Iterieren ohne Build/Installer)
+
+Für die Entwicklung der DE-Logik (RCS-Tickets) muss nicht jedes Mal ein Windows-Installer gebaut werden. Nutze stattdessen den Web-Dev-Modus:
+
+**Starten:** Doppelklick auf `start-dev.bat` im Repo-Root. Das Skript setzt alle Environment-Variablen (Rust, Node 24 via fnm, Strawberry Perl) und startet `pnpm run dev:web`.
+
+**Was dann läuft:**
+- **Vite Dev Server** unter `http://localhost:8080` (Browser öffnen) — Frontend mit Hot-Reload
+- **Backend (rotkehlchen)** auf `http://127.0.0.1:4242` via `uv run` — nimmt automatisch den aktuellen Code aus `rotkehlchen/`
+- **Starling Proxy** auf Port 4141 (Rust)
+- **Colibri** auf Port 4343 (Rust, Preis-Queries)
+
+**Datenverzeichnis:** `C:\Users\jwt\AppData\Local\rotki\develop_data` (separat von Production — Ihre echten rotki-Daten werden nicht berührt).
+
+**Code-Änderungen testen:**
+- **Frontend-Änderungen:** Werden via Vite-HMR sofort im Browser sichtbar.
+- **Backend-Änderungen:** Backend via `Strg+C` stoppen und neu starten (das Skript neu ausführen). Dauert 2-5 Sekunden.
+- **Tests:** Unabhängig vom Dev-Server via `uv run pytest rotkehlchen/tests/unit/...` (Backend muss dafür nicht laufen).
+
+**Erster Start:** Das erste Mal kompiliert Cargo die Rust-Services (Colibri, Starling) — das dauert 10-15 Minuten. Bei jedem weiteren Start sind die Binaries gecacht und der Dev-Server ist in ~10 Sekunden oben.
+
+**Wann trotzdem bauen:** Den vollen `package.py --build full` (→ NSIS-Installer) nur noch für die seltene Endabnahme nutzen, oder wenn Sie eine lauffähige `.exe` verteilen wollen. Für die normale Entwicklung ist er nicht nötig.
+
 ### Roadmap (Stand 09.08.2026)
 
 1. ✅ **Phase 0:** Workspace-Setup (RCS-21 abgeschlossen)
