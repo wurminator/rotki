@@ -1,13 +1,12 @@
 <script lang="ts" setup>
 import type { CreateAccountMode } from '@/modules/auth/create-account/types';
-import type { CreateAccountPayload, LoginCredentials, PremiumSetup } from '@/modules/auth/login';
+import type { CreateAccountPayload, LoginCredentials } from '@/modules/auth/login';
 import CreateAccountSubmitStep
   from '@/modules/auth/create-account/analytics/CreateAccountSubmitStep.vue';
 import CreateAccountCredentials
   from '@/modules/auth/create-account/credentials/CreateAccountCredentials.vue';
 import CreateAccountIntroduction
   from '@/modules/auth/create-account/introduction/CreateAccountIntroduction.vue';
-import CreateAccountPremium from '@/modules/auth/create-account/premium/CreateAccountPremium.vue';
 import { useSavedProfiles } from '@/modules/auth/use-saved-profiles';
 import RotkiLogo from '@/modules/shell/components/RotkiLogo.vue';
 
@@ -30,13 +29,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n({ useScope: 'global' });
 
-const premiumEnabled = ref<boolean>(false);
-const premiumSetupForm = ref<PremiumSetup>({
-  apiKey: '',
-  apiSecret: '',
-  syncDatabase: false,
-});
-
 const credentialsForm = ref<LoginCredentials>({
   password: '',
   username: '',
@@ -56,18 +48,12 @@ const wizardTitle = computed<string>(() =>
 const cancel = (): void => emit('cancel');
 const errorClear = (): void => emit('clear-error');
 
-function resetPremiumState(): void {
-  set(premiumEnabled, false);
-  set(premiumSetupForm, { apiKey: '', apiSecret: '', syncDatabase: false });
-}
-
 function prevStep(): void {
   const next = get(step) - 1;
   set(step, next);
-  if (next === 1) {
+  if (next === 1)
     set(mode, undefined);
-    resetPremiumState();
-  }
+
   if (error)
     errorClear();
 }
@@ -78,10 +64,6 @@ function nextStep(): void {
 
 function selectMode(selected: CreateAccountMode): void {
   set(mode, selected);
-  if (selected === 'restore') {
-    set(premiumEnabled, true);
-    set(premiumSetupForm, { ...get(premiumSetupForm), syncDatabase: true });
-  }
   nextStep();
 }
 
@@ -92,9 +74,6 @@ function confirm() {
       submitUsageAnalytics: get(submitUsageAnalytics),
     },
   };
-
-  if (get(premiumEnabled))
-    payload.premiumSetup = get(premiumSetupForm);
 
   emit('confirm', payload);
 }
@@ -126,16 +105,6 @@ onBeforeMount(loadProfiles);
             >
               <RuiTabItem>
                 <CreateAccountIntroduction @select="selectMode($event)" />
-              </RuiTabItem>
-              <RuiTabItem>
-                <CreateAccountPremium
-                  v-model:premium-enabled="premiumEnabled"
-                  v-model:form="premiumSetupForm"
-                  :loading="loading"
-                  :mode="mode ?? 'create'"
-                  @back="prevStep()"
-                  @next="nextStep()"
-                />
               </RuiTabItem>
               <RuiTabItem>
                 <CreateAccountCredentials

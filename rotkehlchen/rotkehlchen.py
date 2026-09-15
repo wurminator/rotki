@@ -104,6 +104,7 @@ from rotkehlchen.icons import IconManager
 from rotkehlchen.inquirer import Inquirer
 from rotkehlchen.logging import RotkehlchenLogsAdapter
 from rotkehlchen.oracles.structures import CurrentPriceOracle
+from rotkehlchen.premium.local_mode import LOCAL_PREMIUM_MODE
 from rotkehlchen.premium.premium import (
     Premium,
     PremiumCredentials,
@@ -747,6 +748,12 @@ class Rotkehlchen:
         Raises PremiumAuthenticationError if the given key is rejected by the Rotkehlchen server
         """
         log.info('Setting new premium credentials')
+        if LOCAL_PREMIUM_MODE:
+            raise PremiumAuthenticationError(
+                'Premium credentials are disabled in this local build. All locally '
+                'available premium features are already unlocked.',
+            )
+
         if self.premium is not None:
             self.premium.set_credentials(credentials)
         else:
@@ -1493,7 +1500,10 @@ class Rotkehlchen:
 
     def get_settings(self, cursor: DBCursor) -> DBSettings:
         """Returns the db settings with a check whether premium is active or not"""
-        return self.data.db.get_settings(cursor, have_premium=self.premium is not None)
+        return self.data.db.get_settings(
+            cursor,
+            have_premium=self.premium is not None or LOCAL_PREMIUM_MODE,
+        )
 
     def setup_exchange(
             self,

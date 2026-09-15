@@ -5329,6 +5329,7 @@
   "premium_placeholder": {
     "current_plan": "{tier} plan",
     "free_description": "This feature requires a minimum of {tier} tier.",
+    "local_description": "This section relies on components delivered by the rotki cloud and is not available in this local build.",
     "premium_description": "This feature requires a minimum of {tier} tier. Your current tier is {currentTier}."
   },
   "premium_settings": {

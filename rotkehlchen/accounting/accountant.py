@@ -15,6 +15,7 @@ from rotkehlchen.errors.asset import UnknownAsset, UnprocessableTradePair
 from rotkehlchen.errors.misc import AccountingError, RemoteError
 from rotkehlchen.errors.price import NoPriceForGivenTimestamp, PriceQueryUnsupportedAsset
 from rotkehlchen.logging import RotkehlchenLogsAdapter
+from rotkehlchen.premium.premium import has_premium_check
 from rotkehlchen.types import EVM_CHAIN_IDS_WITH_TRANSACTIONS, Timestamp
 from rotkehlchen.utils.data_structures import DefaultLRUCache, LRUCacheWithRemove
 
@@ -128,7 +129,7 @@ class Accountant:
 
         Returns the id of the generated report
         """
-        active_premium = self.premium and self.premium.is_active()
+        active_premium = has_premium_check(self.premium)
         log.info(
             'Start of history processing',
             start_ts=start_ts,

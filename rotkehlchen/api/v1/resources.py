@@ -219,6 +219,7 @@ from rotkehlchen.chain.bitcoin.xpub import XpubData
 from rotkehlchen.chain.evm.types import EvmIndexer, NodeName, WeightedNode
 from rotkehlchen.constants.location_details import LOCATION_DETAILS
 from rotkehlchen.globaldb.handler import GlobalDBHandler
+from rotkehlchen.premium.local_mode import CLOUD_PREMIUM_RESOURCES, LOCAL_PREMIUM_MODE
 from rotkehlchen.premium.premium import (
     GNOSIS_PAY_CAPABILITY,
     MONERIUM_CAPABILITY,
@@ -501,6 +502,19 @@ def require_premium_user(active_check: bool) -> Callable:
                     f'does not have a premium subscription'
                 )
                 if rest_api.rotkehlchen.premium is None:
+                    is_cloud_resource = (
+                        view_class.__class__.__name__ in CLOUD_PREMIUM_RESOURCES
+                    )
+                    if LOCAL_PREMIUM_MODE and not is_cloud_resource:
+                        # locally enforced premium features are unlocked in this build
+                        return f(*args, **kwargs)
+
+                    if is_cloud_resource:
+                        msg = (
+                            'This endpoint requires rotki cloud connectivity which is '
+                            'disabled in this local build'
+                        )
+
                     result_dict = wrap_in_fail_result(msg)
                     return api_response(result_dict, status_code=HTTPStatus.FORBIDDEN)
 

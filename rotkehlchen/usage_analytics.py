@@ -30,6 +30,11 @@ def create_usage_analytics(data_dir: Path) -> dict[str, Any]:
 
 
 def maybe_submit_usage_analytics(data_dir: Path, should_submit: bool) -> None:
+    from rotkehlchen.premium.local_mode import LOCAL_PREMIUM_MODE
+
+    if LOCAL_PREMIUM_MODE:
+        return None  # this build never contacts rotki servers
+
     if not is_production():
         return None  # only submit analytics for production
 

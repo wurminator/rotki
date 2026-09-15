@@ -34,14 +34,6 @@ const steps = computed<{ title: string; description?: string }[]>(() => {
       title: t('create_account.steps.step_1.title'),
     },
     {
-      description: restore
-        ? t('create_account.steps.step_2.restore_description')
-        : t('create_account.steps.step_2.description'),
-      title: restore
-        ? t('create_account.steps.step_2.restore_title')
-        : t('create_account.steps.step_2.title'),
-    },
-    {
       description: t('create_account.steps.step_3.description'),
       title: restore
         ? t('create_account.steps.step_3.restore_title')

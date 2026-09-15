@@ -10,6 +10,7 @@ import requests
 
 from rotkehlchen.accounting.constants import FREE_PNL_EVENTS_LIMIT, FREE_REPORTS_LOOKUP_LIMIT
 from rotkehlchen.constants.limits import FREE_HISTORY_EVENTS_LIMIT
+from rotkehlchen.premium.local_mode import LOCAL_PREMIUM_MODE, LOCAL_PREMIUM_TIER
 from rotkehlchen.premium.premium import get_free_capabilities
 from rotkehlchen.tests.utils.api import (
     api_url_for,
@@ -476,9 +477,12 @@ def test_free_capabilities_expose_every_unlock() -> None:
         'monerium': 'Basic',
         'mcp': 'Basic',
     }
-    with patch(
-        'rotkehlchen.premium.premium.fetch_capability_unlocks',
-        return_value=unlocks,
+    with (
+        patch('rotkehlchen.premium.premium.LOCAL_PREMIUM_MODE', False),
+        patch(
+            'rotkehlchen.premium.premium.fetch_capability_unlocks',
+            return_value=unlocks,
+        ),
     ):
         capabilities = get_free_capabilities()
 
@@ -488,3 +492,20 @@ def test_free_capabilities_expose_every_unlock() -> None:
             'enabled': False,
             'minimum_tier': minimum_tier,
         }, f'free capability {name} missing or not matching its unlock tier'
+
+
+def test_local_mode_capabilities() -> None:
+    """In local premium mode capabilities come from the local table without any server call."""
+    if LOCAL_PREMIUM_MODE is False:
+        pytest.skip('this fork behaviour test only applies to local premium mode')
+
+    capabilities = get_free_capabilities()
+
+    assert capabilities['current_tier'] == LOCAL_PREMIUM_TIER
+    assert capabilities['max_backup_size_mb'] == 0
+    assert capabilities['history_events_limit'] == -1
+    assert capabilities['pnl_events_limit'] == -1
+    for name in ('eth_staking_view', 'graphs_view'):
+        assert capabilities[name]['enabled'] is False, f'{name} is cloud-delivered and must stay locked'  # noqa: E501
+    for name in ('asset_movement_matching', 'gnosispay', 'monerium', 'mcp'):
+        assert capabilities[name]['enabled'] is True, f'{name} is locally enforced and must be unlocked'  # noqa: E501

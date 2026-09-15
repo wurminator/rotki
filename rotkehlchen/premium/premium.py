@@ -37,6 +37,13 @@ from rotkehlchen.errors.api import (
 )
 from rotkehlchen.errors.misc import InputError, RemoteError
 from rotkehlchen.logging import RotkehlchenLogsAdapter
+from rotkehlchen.premium.local_mode import (
+    LOCAL_CAPABILITIES,
+    LOCAL_MAX_BACKUP_SIZE_MB,
+    LOCAL_PREMIUM_MODE,
+    LOCAL_PREMIUM_TIER,
+    LOCAL_USER_LIMITS,
+)
 from rotkehlchen.types import Timestamp
 from rotkehlchen.utils.misc import is_production, set_user_agent
 from rotkehlchen.utils.network import create_session
@@ -241,6 +248,9 @@ def fetch_capability_unlocks() -> dict[str, str]:
 
 def get_free_capabilities() -> PremiumCapabilities:
     """Get capabilities payload for free users."""
+    if LOCAL_PREMIUM_MODE:
+        return get_local_capabilities()
+
     unlocks = fetch_capability_unlocks()
     return PremiumCapabilities(
         current_tier='Free',
@@ -278,6 +288,32 @@ def get_free_capabilities() -> PremiumCapabilities:
             enabled=False,
             minimum_tier=unlocks.get(MCP_CAPABILITY),
         ),
+    )
+
+
+def get_local_capabilities() -> PremiumCapabilities:
+    """Capabilities for local premium mode, without contacting rotki servers."""
+    def cap(name: str) -> PremiumFeatureCapability:
+        return PremiumFeatureCapability(
+            enabled=LOCAL_CAPABILITIES.get(name, False),
+            minimum_tier=None,
+        )
+
+    return PremiumCapabilities(
+        current_tier=LOCAL_PREMIUM_TIER,
+        limit_of_devices=0,
+        pnl_events_limit=LOCAL_USER_LIMITS['pnl_events_limit'],
+        max_backup_size_mb=LOCAL_MAX_BACKUP_SIZE_MB,
+        history_events_limit=LOCAL_USER_LIMITS['history_events_limit'],
+        reports_lookup_limit=LOCAL_USER_LIMITS['reports_lookup_limit'],
+        eth_staked_limit=LOCAL_USER_LIMITS['eth_staked_limit'],
+        eth_staking_view=cap('eth_staking_view'),
+        graphs_view=cap('graphs_view'),
+        event_analysis_view=cap('event_analysis_view'),
+        asset_movement_matching=cap('asset_movement_matching'),
+        gnosispay=cap('gnosispay'),
+        monerium=cap('monerium'),
+        mcp=cap('mcp'),
     )
 
 
@@ -1123,6 +1159,9 @@ def premium_create_and_verify(
 
 def has_premium_check(premium: Premium | None) -> bool:
     """Helper function to check if we have premium"""
+    if LOCAL_PREMIUM_MODE:
+        return True
+
     return premium is not None and premium.is_active()
 
 
@@ -1132,6 +1171,9 @@ def get_user_limit(premium: Premium | None, limit_type: UserLimitType) -> tuple[
     Returns:
         tuple[int, bool]: (limit_value, has_premium)
     """
+    if LOCAL_PREMIUM_MODE:
+        return LOCAL_USER_LIMITS[limit_type.value], True
+
     if premium is None or premium.is_active() is False:
         log.debug(f'No premium subscription or inactive, returning free limit for {limit_type}')
         return limit_type.get_free_limit(), False
@@ -1151,6 +1193,9 @@ def get_user_limit(premium: Premium | None, limit_type: UserLimitType) -> tuple[
 
 def has_premium_capability(premium: Premium | None, capability_name: str) -> bool:
     """Helper function to check if an active premium user has a specific capability."""
+    if LOCAL_PREMIUM_MODE:
+        return LOCAL_CAPABILITIES.get(capability_name, False)
+
     if premium is None or premium.is_active() is False:
         return False
 

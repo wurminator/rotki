@@ -111,6 +111,11 @@ def create_sigil_batch(
 
 def maybe_submit_mcp_usage_analytics(data: dict[str, str]) -> None:
     """Submit one MCP client/model event when usage analytics are enabled."""
+    from rotkehlchen.premium.local_mode import LOCAL_PREMIUM_MODE
+
+    if LOCAL_PREMIUM_MODE:
+        return  # this build never contacts rotki servers
+
     try:
         if query_settings().get('submit_usage_analytics') is not True:
             return
