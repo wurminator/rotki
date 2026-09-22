@@ -3337,11 +3337,17 @@ class DBHandler:
             cursorstr = f'SELECT COUNT(DISTINCT {group_by}) from {entries_table}'
         else:
             cursorstr = f'SELECT COUNT(*) from {entries_table}'
+
+        bindings = []
         if len(kwargs) != 0:
             cursorstr += ' WHERE'
-            cursorstr += op.join([f' {arg} = "{val}" ' for arg, val in kwargs.items()])
+            conditions = []
+            for arg, val in kwargs.items():
+                conditions.append(f' {arg} = ? ')
+                bindings.append(val)
+            cursorstr += op.join(conditions)
         cursorstr += ';'
-        cursor.execute(cursorstr)
+        cursor.execute(cursorstr, bindings)
 
         count = cursor.fetchone()[0]
         if (
