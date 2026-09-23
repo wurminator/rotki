@@ -58,15 +58,14 @@ class Graph(ExternalServiceWithApiKey):
         - May raise APIKeyNotConfigured
         """
         previous_key = self.api_key
-        if (api_key := self._get_api_key()) is None and self.graph_label == CPT_ENS:
-            api_key = ApiKey('d943ea1af415001154223fdf46b6f193')  # key created by yabir enabled for ens  # noqa: E501
-            if self.warning_given is False:
+        # SECURITY FIX: Do not use hardcoded fallback secrets. Fail securely instead.
+        if (api_key := self._get_api_key()) is None:
+            if self.graph_label == CPT_ENS and self.warning_given is False:
                 self.db.msg_aggregator.add_missing_key_message(
                     service=ExternalService.THEGRAPH,
                     location=self.graph_label,
                 )
                 self.warning_given = True
-        elif api_key is None:  # don't bother the user and fail silently. We avoid exhausting the default key  # noqa: E501
             raise APIKeyNotConfigured(f'API key for subgraph {self.graph_label} not found')
 
         if self.client is not None and api_key == previous_key:
